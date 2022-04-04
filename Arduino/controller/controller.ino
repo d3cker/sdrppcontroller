@@ -33,6 +33,7 @@ int bytePos = 0;
 int adc_value = 0;
 int knobCommand = 0;
 int knobKey = 0;
+int lastSNR = 0;
 
 int coolDown = 0;
 
@@ -301,7 +302,9 @@ void loop(){
 
    lcd.setCursor(6,5);
    lcd.print("SNR: ");
+   
    lcd.print(snr);
+   
    lcd.print("     ");
    
    lcd_key = read_LCD_buttons();

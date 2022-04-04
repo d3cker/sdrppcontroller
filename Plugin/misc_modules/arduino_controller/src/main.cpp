@@ -255,6 +255,9 @@ R\n            - Reset controller
 
 */
 
+// this should be rewritten to support some kind of ACK and queue
+// maybe some day ...
+
     void writeArduino(int frequency, int demod, int snr){
         struct timespec currentCall = {0,0};
         int bsend = 0;
@@ -291,6 +294,9 @@ R\n            - Reset controller
             if(snr != lastSnr && delta_us > 500000) {
                 char smsg[5];
                 memset(&smsg,'\0',sizeof(smsg));
+                if (lastSnr - snr > 6 && snr > 0 ) { // just to make readings more ... stable
+                    snr = (lastSnr + snr ) / 2;
+                }
                 snprintf(smsg,5,"S%d\n",snr);
                 bsend = write(serial_port, smsg, strlen(smsg));
 //                spdlog::info(">> Send SNR {0}", smsg);
