@@ -1,7 +1,7 @@
-/*  
+/* 
   Arduino SDR++ Controller - Linux plugin.
   Bartłomiej Marcinkowski
-*/ 
+*/
 
 #include <imgui.h>
 #include <module.h>
@@ -12,7 +12,7 @@
 #include <gui/widgets/frequency_select.h>
 #include <radio_interface.h>
 #include <config.h>
-#include <options.h>
+//#include <options.h> - not available in v1.06 
 #define CONCAT(a, b) ((std::string(a) + b).c_str())
 
 #include <stdio.h>
@@ -69,19 +69,20 @@ public:
     bool isEnabled() {
         return enabled;
     }
-    
+
 private:
     static void menuHandler(void* ctx) {
-        float menuWidth = ImGui::GetContentRegionAvailWidth();
+//        float menuWidth = ImGui::GetContentRegionAvailWidth(); - not available in v1.06
+        float menuWidth = ImGui::GetContentRegionAvail().x;
         int freq = int(gui::waterfall.getCenterFrequency() + sigpath::vfoManager.getOffset(gui::waterfall.selectedVFO));
         int mode;
         core::modComManager.callInterface(gui::waterfall.selectedVFO, RADIO_IFACE_CMD_GET_MODE, NULL, &mode);
         float gSNR = gui::waterfall.selectedVFOSNR;
-        
+
         ArduinoController * _this = (ArduinoController *)ctx;
 
         ImGui::Text("Arduino SDR++ controller");
-        
+
         ImGui::LeftLabel("Serial port:");
         ImGui::SetNextItemWidth(menuWidth - ImGui::GetCursorPosX());
         ImGui::SameLine();
@@ -111,7 +112,6 @@ private:
             _this->readArduino(); 
             _this->writeArduino(freq,mode,(int)gSNR); 
         }
-
     }
 
     std::string name;
@@ -129,7 +129,7 @@ private:
     char commandReady[256];
 
     /* Serial commands (read):
-    
+
     C1 , C4 - Right Knob - fine tune based on snap interval
     C2 , C3 - Left Knob - tune , step = snap interval * 10 
     C7 , C8 - Tune based on same rate - page up / page down
@@ -139,10 +139,11 @@ private:
     */
     void checkCommand(char *command) {
 
-        int snapInt = gui::waterfall.vfos[gui::waterfall.selectedVFO]->snapInterval;
+        ImGui::WaterfallVFO* vfo = gui::waterfall.vfos[gui::waterfall.selectedVFO];
+        int snapInt = vfo->snapInterval;
         double freq = int(gui::waterfall.getCenterFrequency() + sigpath::vfoManager.getOffset(gui::waterfall.selectedVFO));
         double srate = sigpath::signalPath.getSampleRate();
-        
+
         // right knob encoder (fine)tuner (snap interval)
         if(!strncmp(command,"C1",2)) {
             freq += snapInt;
@@ -150,7 +151,7 @@ private:
         if(!strncmp(command,"C4",2)) {
             freq -= snapInt;
         }
-        
+
         // left knob encoder tuner (snap interval * 10)
         if(!strncmp(command,"C2",2)) {
             snapInt *= 10;
@@ -164,7 +165,7 @@ private:
         // up/down tuner (sample rate based) aka pageup/pagedown
         if(!strncmp(command,"C7",2)) {
             freq += srate;
-        }      
+        }
         if(!strncmp(command,"C8",2)) {
             freq -= srate;
         }
@@ -175,7 +176,7 @@ private:
             if(zoom < 0) {
                 zoom = 0;
             }
-        }      
+        }
         if(!strncmp(command,"C9",2)) {
             zoom += 0.1;
             if(zoom > 1) {
@@ -184,25 +185,24 @@ private:
         }
 
         // zoom in / zoom out main windows
-        if (!strncmp(command,"C6",2) || !strncmp(command,"C9",2)) {            
+        if (!strncmp(command,"C6",2) || !strncmp(command,"C9",2)) {
             double factor = (double)zoom * (double)zoom; // This code is duplicated from main_windows.c
             double wfBw = gui::waterfall.getBandwidth(); // I don't know how to update "Zoom" slider.
             double delta = wfBw - 1000.0;
             double finalBw = std::min<double>(1000.0 + (factor * delta), wfBw);
             gui::waterfall.setViewBandwidth(finalBw);
 
-            ImGui::WaterfallVFO* vfo = gui::waterfall.vfos[gui::waterfall.selectedVFO];
             if (vfo != NULL) {
                 gui::waterfall.setViewOffset(vfo->centerOffset);
             }
         }
-        
+
         // set up new frequency in normal mode 
         if (!strncmp(command,"C1",2) || !strncmp(command,"C2",2) || !strncmp(command,"C3",2) || !strncmp(command,"C4",2)) {
             freq = roundl(freq / snapInt) * snapInt;
             tuner::tune(tuner::TUNER_MODE_NORMAL, gui::waterfall.selectedVFO, freq);
         }
-       
+
         // set up new frequency in center mode - for page up / page down / center knob click
         if (!strncmp(command,"C7",2) || !strncmp(command,"C8",2) || !strncmp(command,"CA",2)) {
             tuner::tune(tuner::TUNER_MODE_CENTER, gui::waterfall.selectedVFO, freq);
@@ -224,7 +224,7 @@ private:
     void readArduino() {
         char read_buf[32];
         memset(&read_buf, '\0', sizeof(read_buf));
-      
+
         int num_bytes = read(serial_port,&read_buf,sizeof(read_buf));
 
         if (num_bytes < 0) {
@@ -244,7 +244,7 @@ private:
             //spdlog::info(">> {0}", commandBuf);
             //memset(&commandBuf,'\0',sizeof(commandBuf));
         }
-    
+
     }
 /* Serial commands (write):
 
@@ -289,8 +289,8 @@ R\n            - Reset controller
                 lastDemod = demod;
                 lastCall = currentCall;
                 return;
-            } 
-            
+            }
+
             if(snr != lastSnr && delta_us > 500000) {
                 char smsg[5];
                 memset(&smsg,'\0',sizeof(smsg));
@@ -304,8 +304,6 @@ R\n            - Reset controller
                 lastCall = currentCall;
                 return;
             }
-
-
         }
     }
 
@@ -316,7 +314,7 @@ R\n            - Reset controller
         lastDemod = 0;
         lastFreq = 0;
         lastSnr = 0;
-        spdlog::info("Disconnect Arduino");       
+        spdlog::info("Disconnect Arduino");
     }
     void connectArduino(){
         // Ekhm ... this part was fully googled :) 
@@ -326,9 +324,9 @@ R\n            - Reset controller
         // ... atlthough I'm pretty sure this should be moved to smtg more C++
         // and platform independent 
         struct termios tty;
-        
+
         serial_port = open(ttyport, O_RDWR);
-        
+
         if(tcgetattr(serial_port, &tty) != 0) {
             spdlog::info("Error connecting to Arduino");
             close(serial_port);
@@ -365,7 +363,7 @@ R\n            - Reset controller
             spdlog::info("Error {0} from tcsetattr: {1}\n", errno, strerror(errno));
         }
         clock_gettime(CLOCK_MONOTONIC_RAW, &lastCall);
-        
+
         //send reset command
         int reset_char = write(serial_port, "R\n", 2);
 
@@ -373,7 +371,8 @@ R\n            - Reset controller
 };
 
 MOD_EXPORT void _INIT_() {
-    config.setPath(options::opts.root + "/arduino_controller_config.json");
+//    config.setPath(options::opts.root + "/arduino_controller_config.json"); - not available in v1.06
+    config.setPath(core::args["root"].s() + "/arduino_controller_config.json");
     config.load(json::object());
     config.enableAutoSave();
 }

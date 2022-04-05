@@ -3,10 +3,10 @@
  by Bartłomiej Marcinkowski
 
  Designed and tested on:
- - Arduino Uno rev3
+ - Arduino Leonardo
  - DFRobot DFR0009 LCD + Keys shield 
  - DFRobot EC11 rotary encoder button x2 
-  
+
  Encoder support based on source code taken from DFRobot site: 
  https://wiki.dfrobot.com/EC11_Rotary_Encoder_Module_SKU__SEN0235 (no author info)
 
@@ -37,25 +37,30 @@ int lastSNR = 0;
 
 int coolDown = 0;
 
-int encoderPinA = 2;
-int encoderPinB = 3;
+int encoderPinA = 0;
+int encoderPinB = 1;
 int buttonPin = 11;
 
-int encoderPinC = 12;
-int encoderPinD = 13;
+int encoderPinC = 2;
+int encoderPinD = 3;
 
 //left encoder knob
 volatile int lastEncodedL = 0;
-long lastencoderValueL = 0;
+//long lastencoderValueL = 0;
 int lastMSBL = 0;
 int lastLSBL = 0;
 
 //right encoder knob
 volatile int lastEncodedR = 0;
-volatile long encoderValue = 0;
-long lastencoderValueR = 0;
+//long lastencoderValueR = 0;
 int lastMSBR = 0;
 int lastLSBR = 0;
+
+//volatile long encoderValueL = 0;
+//volatile long encoderValueR = 0;
+
+unsigned long currentReadtime = 0;
+unsigned long lastReadtime = 0;
 
 char freq[16] = "0";
 char snr[5] = "0";
@@ -138,7 +143,9 @@ int read_LCD_buttons(){               // read the buttons
 //    return encoderValue/4;    // we are not counting impulses 
 //}
 
-void(* resetFunc) (void) = 0;
+
+// void(* resetFunc) (void) = 0;
+// ^^ this works different on Leonardo. Serial waits for disconnection? not sure how to handle that
 
 void readCommand() {
     char rchar;
@@ -186,7 +193,8 @@ void readCommand() {
                 case commandRST:
                     //Serial.println("D Reset command received");
                     delay(200);
-                    resetFunc();
+                    Serial.println("D SDR++ Controller init");
+                    //resetFunc(); // again this doesn't work on Leonardo
                     break;
                 case commandFREQ:
                     //Serial.println("D Receinve frequency start");
@@ -200,7 +208,7 @@ void readCommand() {
                 case commandSNR:
                     memset(snr,0,sizeof(snr));
                     startCommand = commandSNR;
-                    break;                         
+                    break;
                 case commandEOL:
                     //Serial.println("D EOL");
                     break;
@@ -210,7 +218,7 @@ void readCommand() {
                     Serial.println(incomingByte);
 
             }
-        }         
+        }
         //Serial.print("I received: ");
         //Serial.println(incomingByte, DEC);
     }
@@ -219,19 +227,17 @@ void readCommand() {
 // This part is a modified example code from DFRobot site.
 // Adjusted to handle two knobs at the same time.
 void updateEncoder(){
-  //Serial.print(firstcall);
-  
+
   int MSBR = digitalRead(encoderPinA); //MSB = most significant bit
   int LSBR = digitalRead(encoderPinB); //LSB = least significant bit
 
   int encodedR = (MSBR << 1) |LSBR; //converting the 2 pin value to single number
   int sumR  = (lastEncodedR << 2) | encodedR; //adding it to the previous encoded value
+  
   if(sumR == 0b1101 || sumR == 0b0100 || sumR == 0b0010 || sumR == 0b1011) { 
-//      encoderValue ++;
       knobCommand = knobRIGHT;
   }
   if(sumR == 0b1110 || sumR == 0b0111 || sumR == 0b0001 || sumR == 0b1000) { 
-//      encoderValue --;
       knobCommand = knobLEFT;
   }
   lastEncodedR = encodedR; //store this value for next time
@@ -242,93 +248,94 @@ void updateEncoder(){
   int encodedL = (MSBL << 1) |LSBL; //converting the 2 pin value to single number  
   int sumL  = (lastEncodedL << 2) | encodedL; //adding it to the previous encoded value
   if(sumL == 0b1101 || sumL == 0b0100 || sumL == 0b0010 || sumL == 0b1011) { 
-  //    encoderValue ++;
       knobCommand = knobUP;
   }
   if(sumL == 0b1110 || sumL == 0b0111 || sumL == 0b0001 || sumL == 0b1000) { 
-  //    encoderValue --;
       knobCommand = knobDOWN;
   }
+
   lastEncodedL = encodedL; //store this value for next time
+
   if (coolDown < 10) { // this strange, added to fix garbage on boot, I don't like it
       coolDown++;
-      knobCommand = inputNONE;    
+      knobCommand = inputNONE;
   }
 }
 
 void setup(){
   Serial.begin(9600);
-  Serial.println("D SDR++ Controller init");
-   
+  while (!Serial) {
+    Serial.println("D SDR++ Controller init");
+  }
   pinMode(encoderPinA, INPUT);
   pinMode(encoderPinB, INPUT);
+  pinMode(encoderPinC, INPUT);
+  pinMode(encoderPinD, INPUT);
   pinMode(buttonPin, INPUT);
  
-  digitalWrite(encoderPinA, HIGH); //turn pullup resistor on
-  digitalWrite(encoderPinB, HIGH); //turn pullup resistor on
+  digitalWrite(encoderPinA, INPUT_PULLUP); //turn pullup resistor on
+  digitalWrite(encoderPinB, INPUT_PULLUP); //turn pullup resistor on
 
-  digitalWrite(encoderPinC, HIGH); //turn pullup resistor on
-  digitalWrite(encoderPinD, HIGH); //turn pullup resistor on
+  digitalWrite(encoderPinC, INPUT_PULLUP); //turn pullup resistor on
+  digitalWrite(encoderPinD, INPUT_PULLUP); //turn pullup resistor on
 
   //call updateEncoder() when any high/low changed seen
   //on interrupt 0 (pin 2), or interrupt 1 (pin 3)
   // This works well for UNO with one knob.  Unfortunately there are only
   // two interrupts and we have to hande four of encoder lines. So... 
   // We do not use interrupts at all and just call updateEncoder() directly.
-  //attachInterrupt(0, updateEncoder, CHANGE);
-  //attachInterrupt(1, updateEncoder, CHANGE);
-  //Not the best solution probably but as for now it does the job. 
+  // this version is for Leonardo so we can use interrupts!
+  attachInterrupt(0, updateEncoder, CHANGE);
+  attachInterrupt(1, updateEncoder, CHANGE);
+  attachInterrupt(2, updateEncoder, CHANGE);
+  attachInterrupt(3, updateEncoder, CHANGE);
 
-   lcd.begin(16, 2);               
-   lcd.setCursor(0,0);             
-   lcd.print("SDR++ Controller");  
+   lcd.begin(16, 2);
+   lcd.setCursor(0,0);
+   lcd.print("SDR++ Controller");
    delay(1000);
    lcd.clear();
 }
- 
+
 void loop(){
-   
-   readCommand();
 
-   lcd.setCursor(0,0);             
-   lcd.print("F: "); 
-   lcd.print(freq); 
-   lcd.print("                ");   
+  readCommand();
+  lcd.setCursor(0,0);
+  lcd.print("F: "); 
+  lcd.print(freq); 
+  lcd.print("                ");
+  lcd.setCursor(0,1);
+  lcd.print("[");
+  lcd.print(modeStr[dMode]);
+  lcd.print("] ");
+  lcd.setCursor(6,5);
+  lcd.print("SNR: ");
+  lcd.print(snr);
+  lcd.print("     ");
 
-   lcd.setCursor(0,1);             
-   lcd.print("[");
-   lcd.print(modeStr[dMode]);
-   lcd.print("] ");
+  lcd_key = read_LCD_buttons();
+  knobKey = read_knob_button();
+  currentReadtime = millis();
 
-   lcd.setCursor(6,5);
-   lcd.print("SNR: ");
-   
-   lcd.print(snr);
-   
-   lcd.print("     ");
-   
-   lcd_key = read_LCD_buttons();
-   knobKey = read_knob_button();
+  //updateEncoder(); // this should be called by interrupt
 
-   updateEncoder(); // this should be called by interrupt but ... read desc. above
-
-   if (lcd_key != inputNONE && isbtnPressed == 0) {
-       Serial.write(commandCTRL);
-       Serial.println(lcd_key);  
-       Serial.flush();
-       isbtnPressed = lcd_key;
-   } else if (knobCommand != inputNONE) {
-       Serial.write(commandCTRL);
-       Serial.println(knobCommand);  
-       Serial.flush(); 
-       knobCommand = inputNONE;
-   } else if (knobKey != inputNONE && isbtnPressed == 0) {
-       Serial.write(commandCTRL);
-       Serial.println(knobKey,HEX);  
-       Serial.flush(); 
-       isbtnPressed = knobKey;
-   } else if (lcd_key == inputNONE && knobKey == inputNONE && isbtnPressed != 0) {
-       isbtnPressed = 0;
+  if (lcd_key != inputNONE && isbtnPressed == 0) {
+      Serial.write(commandCTRL);
+      Serial.println(lcd_key);  
+      Serial.flush();
+      isbtnPressed = lcd_key;
+  } else if (knobCommand != inputNONE) {
+      Serial.write(commandCTRL);
+      Serial.println(knobCommand);  
+      Serial.flush(); 
+      knobCommand = inputNONE;
+  } else if (knobKey != inputNONE && isbtnPressed == 0) {
+      Serial.write(commandCTRL);
+      Serial.println(knobKey,HEX);  
+      Serial.flush(); 
+      isbtnPressed = knobKey;
+  } else if (lcd_key == inputNONE && knobKey == inputNONE && isbtnPressed != 0) {
+      isbtnPressed = 0;
    }
 
 
