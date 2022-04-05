@@ -20,7 +20,7 @@ develop something functional,so here it is: "Arduino SDR++ Controller"
 * [SDR++](https://github.com/AlexandreRouma/SDRPlusPlus) v1.0.6 
 * [Ubuntu](https://ubuntu.com/) Linux 20.04
 * [Arduino UNO](https://www.arduino.cc/en/main/arduinoBoardUno)
-* [Arduino Leonardo](https://www.arduino.cc/en/main/arduinoBoardLeonardo) - preffered
+* [Arduino Leonardo](https://www.arduino.cc/en/main/arduinoBoardLeonardo) - preferred
 * DFRobot DFR0009 [LCD Keypad Shield](https://wiki.dfrobot.com/LCD_KeyPad_Shield_For_Arduino_SKU__DFR0009)
 * 2 * DFRobot [EC11 rotary encoders](https://wiki.dfrobot.com/EC11_Rotary_Encoder_Module_SKU__SEN0235)
 
