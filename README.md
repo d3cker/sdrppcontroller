@@ -3,6 +3,7 @@
 ### Arduino sketch and Linux plugin
 
 [![VIDEO](https://img.youtube.com/vi/_txrEIK9pqs/0.jpg)](https://youtu.be/_txrEIK9pqs)
+_Youtube video_
 
 ## Introduction
 I was inspired by a question asked on RTL-SDR Facebook group. Although this question was 
@@ -16,19 +17,21 @@ Please note: I'm not a software developer and I'm not a very big fan of C++. Yet
 develop something functional,so here it is: "Arduino SDR++ Controller"
 
 ## Environment
-* [SDR++](https://github.com/AlexandreRouma/SDRPlusPlus) v1.0.5 
+* [SDR++](https://github.com/AlexandreRouma/SDRPlusPlus) v1.0.6 
 * [Ubuntu](https://ubuntu.com/) Linux 20.04
 * [Arduino UNO](https://www.arduino.cc/en/main/arduinoBoardUno)
+* [Arduino Leonardo](https://www.arduino.cc/en/main/arduinoBoardLeonardo) - preferred
 * DFRobot DFR0009 [LCD Keypad Shield](https://wiki.dfrobot.com/LCD_KeyPad_Shield_For_Arduino_SKU__DFR0009)
 * 2 * DFRobot [EC11 rotary encoders](https://wiki.dfrobot.com/EC11_Rotary_Encoder_Module_SKU__SEN0235)
 
 ## Building
 In order to build the plugin please follow the instructions from SDR++ README file. Use Arduino IDE to compile the sketch and upload to the board. 
-* _Arduino/controller.ino_ - Arduino code
+* _Arduino/controller_uno/controller_uno.ino_ - Arduino UNO code
+* _Arduino/controller_leonardo/controller_leonardo.ino_ - Arduino Leonardo code
 * _Plugin/misc_modules/arduino_controller/src/main.cpp_ - plugin code
 
+## Wiring for Arduino UNO
 
-## Wiring
 Rotary encoders are connected to digitial pins:
 
 ### "Left" knob:
@@ -41,6 +44,21 @@ Rotary encoders are connected to digitial pins:
 - Hole B -> Pin 2 - right turn
 - Hole C -> Unused - because the shield was out of digital pins 
 
+## Wiring for Arduino Leonardo
+
+Rotary encoders are connected to digitial pins:
+
+### "Left" knob:
+- Hole A -> Pin 2 - left turn
+- Hole B -> Pin 3 - right turn
+- Hole C -> Pin 11 - button
+
+### "Right" knob:
+- Hole A -> Pin 0 - left turn
+- Hole B -> Pin 1 - right turn
+- Hole C -> Unused (for now)
+
+
 ## Connecting to PC 
 Connect Arduino with standard USB cable. It should be registered as a serial device, for example: `/dev/ttyACM0`. 
 
@@ -49,7 +67,8 @@ Connect Arduino with standard USB cable. It should be registered as a serial dev
 - Up , Down - Tune with a step equals to device sample rate.
 - Select - Cycle demodulators. 
 - Left knob - Tune with a step equals to "Snap interval" multiplied by 10.
-- Right knob - Tune with a step equals to "Snap interval" 
+- Right knob - Tune with a step equals to "Snap interval".
+- Knob button - Center waterfall.
 
 ## Usage
 Enable the plugin with "Module Manager". Setup serial port (default: _/dev/ttyACM0_) and click "Start" button.
@@ -68,6 +87,6 @@ I bought everything at [Botland](https://www.botland.store/).
 
 ## Final words
 There is a lot of space for improments. For example I couldn't use interrupts for knobs because Arduino UNO has only two of them and I needed four. I read 
-digital pins in a loop which is not the best practice I suppose. Feel free to contribute. 
+digital pins in a loop which is not the best practice I suppose. This issue doesn't affect Arduino Leonardo. Feel free to contribute. 
 Greetings go to [RTL-SDR Polska](https://www.facebook.com/groups/2628926590655863) Facebook group and specially to Kacper for inspiring me!
 
