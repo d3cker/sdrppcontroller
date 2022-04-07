@@ -18,18 +18,21 @@
 #include <stdio.h>
 #include <string.h>
 
-// some Linux headers for tty handling 
-#include <fcntl.h> 
-#include <errno.h> 
-#include <termios.h> 
-#include <unistd.h> 
-#include <sys/ioctl.h>
+#include <serialib.h>
+
+#if defined (_WIN32) || defined(_WIN64)
+    #define DEFAULT_SERIAL_PORT "\\\\.\\COM4"
+#endif      
+#if defined (__linux__) || defined(__APPLE__)
+    #define DEFAULT_SERIAL_PORT "/dev/ttyACM0"
+#endif
+
 
 SDRPP_MOD_INFO{
     /* Name:            */ "arduino_controller",
     /* Description:     */ "Arduino SDR++ controller",
     /* Author:          */ "Bartłomiej Marcinkowski",
-    /* Version:         */ 0, 1, 0,
+    /* Version:         */ 0, 2, 0,
     /* Max instances    */ 1
 };
 
@@ -43,7 +46,7 @@ public:
 
         config.acquire();
         if (!config.conf.contains(name)) {
-            config.conf[name]["ttyport"] = "/dev/ttyACM0";
+            config.conf[name]["ttyport"] = DEFAULT_SERIAL_PORT;
         }
         config.release(true);
         std::string port = config.conf[name]["ttyport"];
@@ -119,6 +122,8 @@ private:
     bool enabled = true;
     struct timespec lastCall;
     int serial_port = 0;
+    serialib serial;
+
     int lastFreq = 0;
     int lastDemod = 0;
     int lastSnr = 0;
@@ -127,6 +132,7 @@ private:
 
     char commandBuf[256];
     char commandReady[256];
+
 
     /* Serial commands (read):
 
@@ -225,7 +231,7 @@ private:
         char read_buf[32];
         memset(&read_buf, '\0', sizeof(read_buf));
 
-        int num_bytes = read(serial_port,&read_buf,sizeof(read_buf));
+        int num_bytes = serial.readString(read_buf,'\n',sizeof(read_buf),10);
 
         if (num_bytes < 0) {
             spdlog::info("Error reading: {0}", strerror(errno));
@@ -260,8 +266,8 @@ R\n            - Reset controller
 
     void writeArduino(int frequency, int demod, int snr){
         struct timespec currentCall = {0,0};
-        int bsend = 0;
         int delta_us = 0;
+        char bsend;
 
         clock_gettime(CLOCK_MONOTONIC_RAW, &currentCall);
         delta_us = (currentCall.tv_sec - lastCall.tv_sec) * 1000000 + (currentCall.tv_nsec - lastCall.tv_nsec) / 1000;
@@ -273,7 +279,7 @@ R\n            - Reset controller
                 char msg[14];
                 memset(&msg,'\0',sizeof(msg));
                 snprintf(msg,14,"F%d\n",frequency);
-                bsend = write(serial_port, msg, strlen(msg));
+                bsend = serial.writeString(msg);
 //                spdlog::info(">> Send freq {0}", msg);
                 lastFreq = frequency;
                 lastCall = currentCall;
@@ -284,7 +290,7 @@ R\n            - Reset controller
                 char dmsg[14];
                 memset(&dmsg,'\0',sizeof(dmsg));
                 snprintf(dmsg,14,"M%d\n",demod);
-                bsend = write(serial_port, dmsg, strlen(dmsg));
+                bsend = serial.writeString(dmsg);
 //                spdlog::info(">> Send demod {0}", dmsg);
                 lastDemod = demod;
                 lastCall = currentCall;
@@ -298,7 +304,7 @@ R\n            - Reset controller
                     snr = (lastSnr + snr ) / 2;
                 }
                 snprintf(smsg,5,"S%d\n",snr);
-                bsend = write(serial_port, smsg, strlen(smsg));
+                bsend = serial.writeString(smsg);
 //                spdlog::info(">> Send SNR {0}", smsg);
                 lastSnr = snr;
                 lastCall = currentCall;
@@ -308,7 +314,7 @@ R\n            - Reset controller
     }
 
     void disconnectArduino(){
-        close(serial_port);
+        serial.closeDevice();
         serial_port = 0;
         isInit = 0;
         lastDemod = 0;
@@ -316,58 +322,23 @@ R\n            - Reset controller
         lastSnr = 0;
         spdlog::info("Disconnect Arduino");
     }
+
     void connectArduino(){
-        // Ekhm ... this part was fully googled :) 
-        // I do not wrote this & I don't know who did.
-        // It was taken from some example article or overflow.
-        // Since it's working I'm not touching this.
-        // ... atlthough I'm pretty sure this should be moved to smtg more C++
-        // and platform independent 
-        struct termios tty;
-
-        serial_port = open(ttyport, O_RDWR);
-
-        if(tcgetattr(serial_port, &tty) != 0) {
+        // Connection to serial port
+        char errorOpening = serial.openDevice(ttyport, 9600);
+        if (errorOpening!=1) {
             spdlog::info("Error connecting to Arduino");
-            close(serial_port);
             serial_port = 0;
             return;
         }
-
-        tty.c_cflag &= ~PARENB; // Clear parity bit, disabling parity (most common)
-        tty.c_cflag &= ~CSTOPB; // Clear stop field, only one stop bit used in communication (most common)
-        tty.c_cflag &= ~CSIZE; // Clear all bits that set the data size.
-        tty.c_cflag |= CS8; // 8 bits per byte (most common)
-        tty.c_cflag &= ~CRTSCTS; // Disable RTS/CTS hardware flow control (most common)
-        tty.c_cflag |= CREAD | CLOCAL; // Turn on READ & ignore ctrl lines (CLOCAL = 1)
-        tty.c_lflag &= ~ICANON;
-        tty.c_lflag &= ~ECHO; // Disable echo
-        tty.c_lflag &= ~ECHOE; // Disable erasure
-        tty.c_lflag &= ~ECHONL; // Disable new-line echo
-        tty.c_lflag &= ~ISIG; // Disable interpretation of INTR, QUIT and SUSP
-        tty.c_iflag &= ~(IXON | IXOFF | IXANY); // Turn off s/w flow ctrl
-        tty.c_iflag &= ~(IGNBRK|BRKINT|PARMRK|ISTRIP|INLCR|IGNCR|ICRNL); // Disable any special handling of received bytes
-        tty.c_oflag &= OPOST; // Prevent special interpretation of output bytes (e.g. newline chars)
-        tty.c_oflag &= ~ONLCR; // Prevent conversion of newline to carriage return/line feed
-        // tty.c_oflag &= ~OXTABS; // Prevent conversion of tabs to spaces (NOT PRESENT ON LINUX)
-        // tty.c_oflag &= ~ONOEOT; // Prevent removal of C-d chars (0x004) in output (NOT PRESENT ON LINUX)
-
-        tty.c_cc[VTIME] = 0;    // Wait for up to 1s (10 deciseconds), returning as soon as any data is received.
-        tty.c_cc[VMIN] = 0;
-
-        // Set in/out baud rate to be 9600
-        cfsetispeed(&tty, B9600);
-        cfsetospeed(&tty, B9600);
-
-        if (tcsetattr(serial_port, TCSANOW, &tty) != 0) {
-            spdlog::info("Error {0} from tcsetattr: {1}\n", errno, strerror(errno));
-        }
+        serial_port = 1;
         clock_gettime(CLOCK_MONOTONIC_RAW, &lastCall);
 
         //send reset command
-        int reset_char = write(serial_port, "R\n", 2);
+        char reset_char = serial.writeString("R\n");
 
     }
+    
 };
 
 MOD_EXPORT void _INIT_() {
