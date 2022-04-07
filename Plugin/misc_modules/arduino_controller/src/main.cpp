@@ -28,6 +28,7 @@
 #endif
 
 
+
 SDRPP_MOD_INFO{
     /* Name:            */ "arduino_controller",
     /* Description:     */ "Arduino SDR++ controller",
@@ -117,10 +118,27 @@ private:
         }
     }
 
+#if defined (_WIN32) || defined(_WIN64) // this is so ugly...
+    #define CLOCK_MONOTONIC_RAW  4
+    struct timespec { 
+        long tv_sec;
+        long tv_nsec; 
+    }; 
+
+    int clock_gettime(int, struct timespec *spec) {  
+    # define CLOCK_MONOTONIC_RAW  4
+        __int64 wintime; GetSystemTimeAsFileTime((FILETIME*)&wintime);
+        wintime      -=116444736000000000i64;  //1jan1601 to 1jan1970
+        spec->tv_sec  =wintime / 10000000i64;           //seconds
+        spec->tv_nsec =wintime % 10000000i64 *100;      //nano-seconds
+        return 0;
+    }
+#endif      
+
     std::string name;
     char ttyport[1024];
     bool enabled = true;
-    struct timespec lastCall;
+    struct timespec lastCall = {0,0};
     int serial_port = 0;
     serialib serial;
 
@@ -231,7 +249,8 @@ private:
         char read_buf[32];
         memset(&read_buf, '\0', sizeof(read_buf));
 
-        int num_bytes = serial.readString(read_buf,'\n',sizeof(read_buf),10);
+// this is not working exactly as I expected. I do not like windows
+        int num_bytes = serial.readBytes(read_buf,sizeof(read_buf),1,0);
 
         if (num_bytes < 0) {
             spdlog::info("Error reading: {0}", strerror(errno));
