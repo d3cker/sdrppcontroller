@@ -1,6 +1,6 @@
 # sdrppcontroller
 ## Arduino SDR++ Controller
-### Arduino sketch and Linux plugin
+### Arduino sketch + Linux and Windows plugin
 
 [![VIDEO](https://img.youtube.com/vi/_txrEIK9pqs/0.jpg)](https://youtu.be/_txrEIK9pqs)
 _Youtube video_
@@ -11,7 +11,7 @@ about controlling SDR# with Arduino I decided to give a try with SDR++. I took a
 rig_ctrl plugin, but it was missing some gui functionalities. Also this plugin was 
 designed to controll the software via network and its purpose in general was quite different 
 from what I wanted to achieve. That's why I decided to try something by my own.
-Parts of the code was taken from Botland store and DRFrobot wiki. Serial initialization was 
+Parts of the code were taken from Botland store and DRFrobot wiki. Serial initialization was 
 googled and found in some Stackoverlow answer (hopefully). I just glued those pieces toghether. 
 Please note: I'm not a software developer and I'm not a very big fan of C++. Yet, I manged to 
 develop something functional,so here it is: "Arduino SDR++ Controller"
@@ -85,8 +85,11 @@ I bought everything at [Botland](https://www.botland.store/).
 - [LCD Keypad shield](https://botland.com.pl/arduino-shield-klawiatury-i-wyswietlacze/2729-dfrobot-lcd-keypad-shield-v11-wyswietlacz-dla-arduino-5903351243780.html)
 - [Case](https://botland.com.pl/obudowy-do-arduino/19020-obudowa-do-arduino-uno-z-lcd-keypad-shield-v11-czarno-przezroczysta-5904422362942.html)
 
+
+## Multiplatform Serialib 
+Multiplatform serial communication done with [Serialib](https://github.com/imabot2/serialib) by Philippe Lucidarme. Accoriding to author this library is license-free.
+
 ## Final words
 There is a lot of space for improments. For example I couldn't use interrupts for knobs because Arduino UNO has only two of them and I needed four. I read 
 digital pins in a loop which is not the best practice I suppose. This issue doesn't affect Arduino Leonardo. Feel free to contribute. 
 Greetings go to [RTL-SDR Polska](https://www.facebook.com/groups/2628926590655863) Facebook group and specially to Kacper for inspiring me!
-
