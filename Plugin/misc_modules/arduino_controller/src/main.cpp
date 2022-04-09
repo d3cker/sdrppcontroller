@@ -229,6 +229,7 @@ private:
 
         // set up new frequency in center mode - for page up / page down / center knob click
         if (!strncmp(command,"C7",2) || !strncmp(command,"C8",2) || !strncmp(command,"CA",2)) {
+            if(freq < gui::waterfall.getBandwidth() / 2 || freq < 0) freq = gui::waterfall.getBandwidth() / 2;
             tuner::tune(tuner::TUNER_MODE_CENTER, gui::waterfall.selectedVFO, freq);
         }
 
