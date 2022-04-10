@@ -33,6 +33,7 @@ int bytePos = 0;
 int adc_value = 0;
 int knobCommand = 0;
 int knobKey = 0;
+int dSNR = 0;
 int lastSNR = 0;
 
 int coolDown = 0;
@@ -43,6 +44,8 @@ int buttonPin = 11;
 
 int encoderPinC = 2;
 int encoderPinD = 3;
+
+int ledPin = 13;
 
 //left encoder knob
 volatile int lastEncodedL = 0;
@@ -59,11 +62,12 @@ int lastLSBR = 0;
 //volatile long encoderValueL = 0;
 //volatile long encoderValueR = 0;
 
-unsigned long currentReadtime = 0;
-unsigned long lastReadtime = 0;
+//unsigned long currentReadtime = 0;
+//unsigned long lastReadtime = 0;
 
 char freq[16] = "0";
 char snr[5] = "0";
+
 
 #define inputNONE  0
 
@@ -272,6 +276,8 @@ void setup(){
   pinMode(encoderPinC, INPUT);
   pinMode(encoderPinD, INPUT);
   pinMode(buttonPin, INPUT);
+  pinMode(ledPin,OUTPUT); // led SNR
+
  
   digitalWrite(encoderPinA, INPUT_PULLUP); //turn pullup resistor on
   digitalWrite(encoderPinB, INPUT_PULLUP); //turn pullup resistor on
@@ -284,7 +290,7 @@ void setup(){
   // This works well for UNO with one knob.  Unfortunately there are only
   // two interrupts and we have to hande four of encoder lines. So... 
   // We do not use interrupts at all and just call updateEncoder() directly.
-  // this version is for Leonardo so we can use interrupts!
+  // This version is for Leonardo so we can use interrupts!
   attachInterrupt(0, updateEncoder, CHANGE);
   attachInterrupt(1, updateEncoder, CHANGE);
   attachInterrupt(2, updateEncoder, CHANGE);
@@ -312,10 +318,24 @@ void loop(){
   lcd.print("SNR: ");
   lcd.print(snr);
   lcd.print("     ");
+  
+  // update SNR led
+  dSNR = atoi(snr);
 
+  if (dSNR < 12) dSNR = 0; 
+  else if (dSNR > 90) dSNR = 90;
+  
+  if (dSNR < lastSNR) {
+      dSNR = lastSNR - 1; // just slow down with fade out 
+  }
+  lastSNR = dSNR;
+  int pwmvalue = (dSNR * 255) / 90;
+  analogWrite(ledPin,pwmvalue);
+  
+  
   lcd_key = read_LCD_buttons();
   knobKey = read_knob_button();
-  currentReadtime = millis();
+  //currentReadtime = millis();
 
   //updateEncoder(); // this should be called by interrupt
 
@@ -337,8 +357,6 @@ void loop(){
   } else if (lcd_key == inputNONE && knobKey == inputNONE && isbtnPressed != 0) {
       isbtnPressed = 0;
    }
-
-
 
   
 // This part may be used to handle extra actions for buttons.
