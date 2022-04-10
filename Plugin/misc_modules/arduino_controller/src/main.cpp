@@ -162,6 +162,7 @@ private:
 
     */
     void checkCommand(char *command) {
+        //spdlog::info("Command>> {0}",command);
 
         ImGui::WaterfallVFO* vfo = gui::waterfall.vfos[gui::waterfall.selectedVFO];
         int snapInt = vfo->snapInterval;
@@ -229,7 +230,7 @@ private:
 
         // set up new frequency in center mode - for page up / page down / center knob click
         if (!strncmp(command,"C7",2) || !strncmp(command,"C8",2) || !strncmp(command,"CA",2)) {
-            if(freq < gui::waterfall.getBandwidth() / 2 || freq < 0) freq = gui::waterfall.getBandwidth() / 2;
+            if(freq < gui::waterfall.getBandwidth() / 2 || freq < 0) freq = gui::waterfall.getBandwidth() / 2; //  avoid tuning with center < 0
             tuner::tune(tuner::TUNER_MODE_CENTER, gui::waterfall.selectedVFO, freq);
         }
 
@@ -250,7 +251,6 @@ private:
         char read_buf[32];
         memset(&read_buf, '\0', sizeof(read_buf));
 
-// this is not working exactly as I expected. I do not like windows
         int num_bytes = serial.readBytes(read_buf,sizeof(read_buf),1,0);
 
         if (num_bytes < 0) {
@@ -260,15 +260,20 @@ private:
             if (commandBuf[strlen(commandBuf)-1] == '\n') {
                 memcpy(commandReady,commandBuf,sizeof(commandReady));
                 memset(&commandBuf,'\0',sizeof(commandBuf));  
-                spdlog::info(">> {0}", commandReady);
+                //spdlog::info(">> {0}", commandReady);
                 if (isInit == 0) { 
                     isInit = 1;
-                    spdlog::info(">> Received first line");
+                    spdlog::info(">> Received first line, so Init!");
                 }
-                checkCommand(commandReady);
+                char *token = strtok(commandReady, "\n");
+                // in case we get more than one command on Windows 
+                // never happened to me on Linux
+                while( token != NULL ) {
+                    //checkCommand(commandReady);
+                    checkCommand(token);
+                    token = strtok(NULL, "\n");
+                }                
             }
-            //spdlog::info(">> {0}", commandBuf);
-            //memset(&commandBuf,'\0',sizeof(commandBuf));
         }
 
     }
