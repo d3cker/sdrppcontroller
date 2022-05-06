@@ -300,38 +300,28 @@ R\n            - Reset controller
         // do not flood this poor Arduino
         if (delta_us > 200000 && isInit > 0) {
             if(frequency != lastFreq) {
-//                spdlog::info(">> Delta [{0}] {1} {2} {3} {4}", delta_us,lastCall.tv_nsec,lastCall.tv_sec,currentCall.tv_nsec,currentCall.tv_sec);
                 char msg[14];
                 memset(&msg,'\0',sizeof(msg));
                 snprintf(msg,14,"F%d\n",frequency);
                 bsend = serial.writeString(msg);
-//                spdlog::info(">> Send freq {0}", msg);
                 lastFreq = frequency;
                 lastCall = currentCall;
                 return;
             } 
 
-            if(demod != lastDemod) {
-                char dmsg[14];
-                memset(&dmsg,'\0',sizeof(dmsg));
-                snprintf(dmsg,14,"M%d\n",demod);
-                bsend = serial.writeString(dmsg);
-//                spdlog::info(">> Send demod {0}", dmsg);
-                lastDemod = demod;
-                lastCall = currentCall;
-                return;
-            }
-
-            if(snr != lastSnr && delta_us > 500000) {
-                char smsg[5];
-                memset(&smsg,'\0',sizeof(smsg));
+            if((snr != lastSnr || demod != lastDemod) && delta_us > 500000) {
+                char msg[5];
+                memset(&msg,'\0',sizeof(msg));
                 if (lastSnr - snr > 6 && snr > 0 ) { // just to make readings more ... stable
                     snr = (lastSnr + snr ) / 2;
                 }
-                snprintf(smsg,5,"S%d\n",snr);
-                bsend = serial.writeString(smsg);
-//                spdlog::info(">> Send SNR {0}", smsg);
+                snprintf(msg,5,"S%d\n",snr);
+                bsend = serial.writeString(msg);
+                memset(&msg,'\0',sizeof(msg));
+                snprintf(msg,14,"M%d\n",demod);
+                bsend = serial.writeString(msg);
                 lastSnr = snr;
+                lastDemod = demod;
                 lastCall = currentCall;
                 return;
             }
@@ -356,6 +346,7 @@ R\n            - Reset controller
             serial_port = 0;
             return;
         }
+        serial.setDTR();
         serial_port = 1;
         clock_gettime(CLOCK_MONOTONIC_RAW, &lastCall);
 
