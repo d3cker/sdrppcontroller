@@ -111,7 +111,7 @@ private:
         }
 
         ImGui::Text("Serial debug > %s", _this->commandReady);
-
+//        spdlog::info("Received>> {0}",_this->commandReady);
         if (_this->serial_port) {
             _this->readArduino(); 
             _this->writeArduino(freq,mode,(int)gSNR); 
@@ -304,6 +304,7 @@ R\n            - Reset controller
                 memset(&msg,'\0',sizeof(msg));
                 snprintf(msg,14,"F%d\n",frequency);
                 bsend = serial.writeString(msg);
+                //spdlog::info("Command>> {0}",msg);
                 lastFreq = frequency;
                 lastCall = currentCall;
                 return;
@@ -315,11 +316,16 @@ R\n            - Reset controller
                 if (lastSnr - snr > 6 && snr > 0 ) { // just to make readings more ... stable
                     snr = (lastSnr + snr ) / 2;
                 }
+                if(snr < 0 ) snr = 0;
                 snprintf(msg,5,"S%d\n",snr);
                 bsend = serial.writeString(msg);
+                //spdlog::info("Command>> {0}",msg);
+
                 memset(&msg,'\0',sizeof(msg));
                 snprintf(msg,14,"M%d\n",demod);
                 bsend = serial.writeString(msg);
+                //spdlog::info("Command>> {0}",msg);
+
                 lastSnr = snr;
                 lastDemod = demod;
                 lastCall = currentCall;
