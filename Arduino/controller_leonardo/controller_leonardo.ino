@@ -1,5 +1,5 @@
 /*************************************************************************************
- SDR++ Controller 
+ SDR++ Serial Controller 
  by Bartłomiej Marcinkowski
 
  Designed and tested on:
@@ -183,9 +183,10 @@ void readCommand() {
                 if(dMode > 7 || dMode < 0) {
                   Serial.println("D Wrong mode");
                   dMode = 0;
-                } else {
-                    Serial.println(modeStr[dMode]);
-                }
+                } 
+//                else {
+//                    Serial.println(modeStr[dMode]);
+//                }
                 break;
             default:
                 break;
