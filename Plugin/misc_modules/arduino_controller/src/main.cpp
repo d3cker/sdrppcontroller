@@ -1,5 +1,5 @@
 /* 
-  SDR++ Serial Controller - Linux plugin.
+  SDR++ Serial Controller - plugin.
   Bartłomiej Marcinkowski
 */
 
@@ -33,7 +33,7 @@ SDRPP_MOD_INFO{
     /* Name:            */ "serial_controller",
     /* Description:     */ "SDR++ Serial Controller",
     /* Author:          */ "Bartłomiej Marcinkowski",
-    /* Version:         */ 0, 2, 0,
+    /* Version:         */ 0, 9, 0,
     /* Max instances    */ 1
 };
 
@@ -102,7 +102,7 @@ private:
         ImGui::TextUnformatted("Hud delay:");
         ImGui::SameLine();
         ImGui::SetNextItemWidth(menuWidth - ImGui::GetCursorPosX());
-        if(ImGui::SliderInt(("##_update_interval_" + _this->name).c_str(), &_this->update_mul, 1, 5, "%d")) {
+        if(ImGui::SliderInt(("##_update_mul_" + _this->name).c_str(), &_this->update_mul, 1, 5, "%d")) {
             config.acquire();
             config.conf[_this->name]["update_mul"] = _this->update_mul;
             config.release(true);
