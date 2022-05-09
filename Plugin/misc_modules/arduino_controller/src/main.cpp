@@ -1,5 +1,5 @@
 /* 
-  Arduino SDR++ Controller - Linux plugin.
+  SDR++ Serial Controller - Linux plugin.
   Bartłomiej Marcinkowski
 */
 
@@ -30,8 +30,8 @@
 
 
 SDRPP_MOD_INFO{
-    /* Name:            */ "arduino_controller",
-    /* Description:     */ "Arduino SDR++ controller",
+    /* Name:            */ "serial_controller",
+    /* Description:     */ "SDR++ Serial Controller",
     /* Author:          */ "Bartłomiej Marcinkowski",
     /* Version:         */ 0, 2, 0,
     /* Max instances    */ 1
@@ -39,27 +39,30 @@ SDRPP_MOD_INFO{
 
 ConfigManager config;
 
-class ArduinoController : public ModuleManager::Instance {
+class SerialController : public ModuleManager::Instance {
 public:
-    ArduinoController(std::string name) {
+    SerialController(std::string name) {
         this->name = name;
         gui::menu.registerEntry(name, menuHandler, this, NULL);
 
         config.acquire();
         if (!config.conf.contains(name)) {
             config.conf[name]["ttyport"] = DEFAULT_SERIAL_PORT;
+            config.conf[name]["update_mul"] = 5;
         }
         config.release(true);
         std::string port = config.conf[name]["ttyport"];
+        update_mul = config.conf[name]["update_mul"];
         strcpy(ttyport, port.c_str());
+        
+        memset(&commandReady,'\0',sizeof(commandReady));  
     }
 
-    ~ArduinoController() {
+    ~SerialController() {
         gui::menu.removeEntry(name);
     }
 
     void postInit() {
-        //connectArduino();
     }
 
     void enable() {
@@ -83,24 +86,33 @@ private:
         core::modComManager.callInterface(gui::waterfall.selectedVFO, RADIO_IFACE_CMD_GET_MODE, NULL, &mode);
         float gSNR = gui::waterfall.selectedVFOSNR;
 
-        ArduinoController * _this = (ArduinoController *)ctx;
+        SerialController * _this = (SerialController *)ctx;
 
-        ImGui::Text("Arduino SDR++ controller");
+        ImGui::Text("SDR++ Serial Controller");
 
         ImGui::LeftLabel("Serial port:");
         ImGui::SetNextItemWidth(menuWidth - ImGui::GetCursorPosX());
         ImGui::SameLine();
-        if (ImGui::InputText(CONCAT("##_arduino_controller_ttyport_", _this->name), _this->ttyport, 1023)) {
+        if (ImGui::InputText(CONCAT("##_serial_controller_ttyport_", _this->name), _this->ttyport, 1023)) {
             config.acquire();
             config.conf[_this->name]["ttyport"] = std::string(_this->ttyport);
             config.release(true);
         }
-
-        if (_this->serial_port && ImGui::Button(CONCAT("Stop##_arduino_controller_stop_", _this->name), ImVec2(menuWidth, 0))) {
-            _this->disconnectArduino();
+        
+        ImGui::TextUnformatted("Hud delay:");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(menuWidth - ImGui::GetCursorPosX());
+        if(ImGui::SliderInt(("##_update_interval_" + _this->name).c_str(), &_this->update_mul, 1, 5, "%d")) {
+            config.acquire();
+            config.conf[_this->name]["update_mul"] = _this->update_mul;
+            config.release(true);
         }
-        else if (!_this->serial_port && ImGui::Button(CONCAT("Start##_arduino_controller_stop_", _this->name), ImVec2(menuWidth, 0))) {
-            _this->connectArduino();
+
+        if (_this->serial_port && ImGui::Button(CONCAT("Stop##_serial_controller_stop_", _this->name), ImVec2(menuWidth, 0))) {
+            _this->disconnectController();
+        }
+        else if (!_this->serial_port && ImGui::Button(CONCAT("Start##_serial_controller_stop_", _this->name), ImVec2(menuWidth, 0))) {
+            _this->connectController();
         }
         ImGui::TextUnformatted("Status:");
         ImGui::SameLine();
@@ -110,11 +122,11 @@ private:
             ImGui::TextColored(ImVec4(0.0, 1.0, 1.0, 1.0), "Disconnected");
         }
 
+
         ImGui::Text("Serial debug > %s", _this->commandReady);
-//        spdlog::info("Received>> {0}",_this->commandReady);
         if (_this->serial_port) {
-            _this->readArduino(); 
-            _this->writeArduino(freq,mode,(int)gSNR); 
+            _this->readController(); 
+            _this->writeController(freq,mode,(int)gSNR); 
         }
     }
 
@@ -141,6 +153,7 @@ private:
     struct timespec lastCall = {0,0};
     int serial_port = 0;
     serialib serial;
+    int update_mul = 5;
 
     int lastFreq = 0;
     int lastDemod = 0;
@@ -150,7 +163,6 @@ private:
 
     char commandBuf[256];
     char commandReady[256];
-
 
     /* Serial commands (read):
 
@@ -247,7 +259,7 @@ private:
         }
     }
 
-    void readArduino() {
+    void readController() {
         char read_buf[32];
         memset(&read_buf, '\0', sizeof(read_buf));
 
@@ -259,7 +271,7 @@ private:
             strncat(commandBuf,read_buf,num_bytes);
             if (commandBuf[strlen(commandBuf)-1] == '\n') {
                 memcpy(commandReady,commandBuf,sizeof(commandReady));
-                memset(&commandBuf,'\0',sizeof(commandBuf));  
+                memset(&commandBuf,'\0',sizeof(commandBuf));
                 //spdlog::info(">> {0}", commandReady);
                 if (isInit == 0) { 
                     isInit = 1;
@@ -289,7 +301,7 @@ R\n            - Reset controller
 // this should be rewritten to support some kind of ACK and queue
 // maybe some day ...
 
-    void writeArduino(int frequency, int demod, int snr){
+    void writeController(int frequency, int demod, int snr){
         struct timespec currentCall = {0,0};
         int delta_us = 0;
         char bsend;
@@ -310,7 +322,7 @@ R\n            - Reset controller
                 return;
             } 
 
-            if((snr != lastSnr || demod != lastDemod) && delta_us > 500000) {
+            if((snr != lastSnr || demod != lastDemod) && delta_us > (100000 * update_mul)) {
                 char msg[5];
                 memset(&msg,'\0',sizeof(msg));
                 if (lastSnr - snr > 6 && snr > 0 ) { // just to make readings more ... stable
@@ -334,21 +346,21 @@ R\n            - Reset controller
         }
     }
 
-    void disconnectArduino(){
+    void disconnectController(){
         serial.closeDevice();
         serial_port = 0;
         isInit = 0;
         lastDemod = 0;
         lastFreq = 0;
         lastSnr = 0;
-        spdlog::info("Disconnect Arduino");
+        spdlog::info("Disconnect controller");
     }
 
-    void connectArduino(){
+    void connectController(){
         // Connection to serial port
         char errorOpening = serial.openDevice(ttyport, 9600);
         if (errorOpening!=1) {
-            spdlog::info("Error connecting to Arduino");
+            spdlog::info("Error connecting to controller");
             serial_port = 0;
             return;
         }
@@ -365,17 +377,17 @@ R\n            - Reset controller
 
 MOD_EXPORT void _INIT_() {
 //    config.setPath(options::opts.root + "/arduino_controller_config.json"); - not available in v1.06
-    config.setPath(core::args["root"].s() + "/arduino_controller_config.json");
+    config.setPath(core::args["root"].s() + "/serial_controller_config.json");
     config.load(json::object());
     config.enableAutoSave();
 }
 
 MOD_EXPORT ModuleManager::Instance* _CREATE_INSTANCE_(std::string name) {
-    return new ArduinoController(name);
+    return new SerialController(name);
 }
 
 MOD_EXPORT void _DELETE_INSTANCE_(void* instance) {
-    delete (ArduinoController *)instance;
+    delete (SerialController *)instance;
 }
 
 MOD_EXPORT void _END_() {
