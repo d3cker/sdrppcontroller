@@ -54,7 +54,7 @@ public:
         std::string port = config.conf[name]["ttyport"];
         update_mul = config.conf[name]["update_mul"];
         strcpy(ttyport, port.c_str());
-        
+
         memset(&commandReady,'\0',sizeof(commandReady));  
     }
 
@@ -98,7 +98,7 @@ private:
             config.conf[_this->name]["ttyport"] = std::string(_this->ttyport);
             config.release(true);
         }
-        
+
         ImGui::TextUnformatted("Hud delay:");
         ImGui::SameLine();
         ImGui::SetNextItemWidth(menuWidth - ImGui::GetCursorPosX());
@@ -125,17 +125,17 @@ private:
 
         ImGui::Text("Serial debug > %s", _this->commandReady);
         if (_this->serial_port) {
-            _this->readController(); 
-            _this->writeController(freq,mode,(int)gSNR); 
+            _this->readController();
+            _this->writeController(freq,mode,(int)gSNR);
         }
     }
 
 #if defined (_WIN32) || defined(_WIN64) // this is so ugly...
     #define CLOCK_MONOTONIC_RAW  4
-    struct timespec { 
+    struct timespec {
         long tv_sec;
-        long tv_nsec; 
-    }; 
+        long tv_nsec;
+    };
 
     int clock_gettime(int, struct timespec *spec) {  
     # define CLOCK_MONOTONIC_RAW  4
@@ -145,7 +145,7 @@ private:
         spec->tv_nsec =wintime % 10000000i64 *100;      //nano-seconds
         return 0;
     }
-#endif      
+#endif
 
     std::string name;
     char ttyport[1024];
@@ -284,7 +284,7 @@ private:
                     //checkCommand(commandReady);
                     checkCommand(token);
                     token = strtok(NULL, "\n");
-                }                
+                }
             }
         }
 
@@ -334,7 +334,7 @@ R\n            - Reset controller
                 //spdlog::info("Command>> {0}",msg);
 
                 memset(&msg,'\0',sizeof(msg));
-                snprintf(msg,14,"M%d\n",demod);
+                snprintf(msg,5,"M%d\n",demod);
                 bsend = serial.writeString(msg);
                 //spdlog::info("Command>> {0}",msg);
 
@@ -372,7 +372,7 @@ R\n            - Reset controller
         char reset_char = serial.writeString("R\n");
 
     }
-    
+
 };
 
 MOD_EXPORT void _INIT_() {
