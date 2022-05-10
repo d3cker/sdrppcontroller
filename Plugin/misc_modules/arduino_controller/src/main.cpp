@@ -13,21 +13,17 @@
 #include <radio_interface.h>
 #include <config.h>
 //#include <options.h> - not available in v1.06 
-#define CONCAT(a, b) ((std::string(a) + b).c_str())
-
 #include <stdio.h>
 #include <string.h>
-
 #include <serialib.h>
+#define CONCAT(a, b) ((std::string(a) + b).c_str())
 
 #if defined (_WIN32) || defined(_WIN64)
     #define DEFAULT_SERIAL_PORT "\\\\.\\COM4"
-#endif      
+#endif
 #if defined (__linux__) || defined(__APPLE__)
     #define DEFAULT_SERIAL_PORT "/dev/ttyACM0"
 #endif
-
-
 
 SDRPP_MOD_INFO{
     /* Name:            */ "serial_controller",
@@ -305,6 +301,7 @@ R\n            - Reset controller
         struct timespec currentCall = {0,0};
         int delta_us = 0;
         char bsend;
+        char msg[14];
 
         clock_gettime(CLOCK_MONOTONIC_RAW, &currentCall);
         delta_us = (currentCall.tv_sec - lastCall.tv_sec) * 1000000 + (currentCall.tv_nsec - lastCall.tv_nsec) / 1000;
@@ -312,7 +309,6 @@ R\n            - Reset controller
         // do not flood this poor Arduino
         if (delta_us > 200000 && isInit > 0) {
             if(frequency != lastFreq) {
-                char msg[14];
                 memset(&msg,'\0',sizeof(msg));
                 snprintf(msg,14,"F%d\n",frequency);
                 bsend = serial.writeString(msg);
@@ -323,18 +319,17 @@ R\n            - Reset controller
             } 
 
             if((snr != lastSnr || demod != lastDemod) && delta_us > (100000 * update_mul)) {
-                char msg[5];
                 memset(&msg,'\0',sizeof(msg));
                 if (lastSnr - snr > 6 && snr > 0 ) { // just to make readings more ... stable
                     snr = (lastSnr + snr ) / 2;
                 }
                 if(snr < 0 ) snr = 0;
-                snprintf(msg,5,"S%d\n",snr);
+                snprintf(msg,14,"S%d\n",snr);
                 bsend = serial.writeString(msg);
                 //spdlog::info("Command>> {0}",msg);
 
                 memset(&msg,'\0',sizeof(msg));
-                snprintf(msg,5,"M%d\n",demod);
+                snprintf(msg,14,"M%d\n",demod);
                 bsend = serial.writeString(msg);
                 //spdlog::info("Command>> {0}",msg);
 
