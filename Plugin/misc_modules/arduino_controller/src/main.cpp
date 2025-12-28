@@ -166,7 +166,8 @@ private:
         ImGui::WaterfallVFO* vfo = gui::waterfall.vfos[gui::waterfall.selectedVFO];
         int snapInt = vfo->snapInterval;
         double freq = int(gui::waterfall.getCenterFrequency() + sigpath::vfoManager.getOffset(gui::waterfall.selectedVFO));
-        double srate = sigpath::signalPath.getSampleRate();
+        double srate = sigpath::iqFrontEnd.getSampleRate();
+
 
         // right knob encoder (fine)tuner (snap interval)
         if(!strncmp(command,"C1",2)) {
@@ -253,20 +254,20 @@ private:
         int num_bytes = serial.readBytes(read_buf,sizeof(read_buf),1,0);
 
         if (num_bytes < 0) {
-            spdlog::info("Error reading: {0}", strerror(errno));
+            flog::info("Error reading: {0}", strerror(errno));
         } else if (num_bytes > 0) {
             strncat(commandBuf,read_buf,num_bytes);
             if (commandBuf[strlen(commandBuf)-1] == '\n') {
                 memcpy(commandReady,commandBuf,sizeof(commandReady));
                 memset(&commandBuf,'\0',sizeof(commandBuf));  
-                spdlog::info(">> {0}", commandReady);
+                flog::info(">> {0}", commandReady);
                 if (isInit == 0) { 
                     isInit = 1;
-                    spdlog::info(">> Received first line");
+                    flog::info(">> Received first line");
                 }
                 checkCommand(commandReady);
             }
-            //spdlog::info(">> {0}", commandBuf);
+            //flog::info(">> {0}", commandBuf);
             //memset(&commandBuf,'\0',sizeof(commandBuf));
         }
 
@@ -294,12 +295,12 @@ R\n            - Reset controller
         // do not flood this poor Arduino
         if (delta_us > 200000 && isInit > 0) {
             if(frequency != lastFreq) {
-//                spdlog::info(">> Delta [{0}] {1} {2} {3} {4}", delta_us,lastCall.tv_nsec,lastCall.tv_sec,currentCall.tv_nsec,currentCall.tv_sec);
+//                flog::info(">> Delta [{0}] {1} {2} {3} {4}", delta_us,lastCall.tv_nsec,lastCall.tv_sec,currentCall.tv_nsec,currentCall.tv_sec);
                 char msg[14];
                 memset(&msg,'\0',sizeof(msg));
                 snprintf(msg,14,"F%d\n",frequency);
                 bsend = serial.writeString(msg);
-//                spdlog::info(">> Send freq {0}", msg);
+//                flog::info(">> Send freq {0}", msg);
                 lastFreq = frequency;
                 lastCall = currentCall;
                 return;
@@ -310,7 +311,7 @@ R\n            - Reset controller
                 memset(&dmsg,'\0',sizeof(dmsg));
                 snprintf(dmsg,14,"M%d\n",demod);
                 bsend = serial.writeString(dmsg);
-//                spdlog::info(">> Send demod {0}", dmsg);
+//                flog::info(">> Send demod {0}", dmsg);
                 lastDemod = demod;
                 lastCall = currentCall;
                 return;
@@ -324,7 +325,7 @@ R\n            - Reset controller
                 }
                 snprintf(smsg,5,"S%d\n",snr);
                 bsend = serial.writeString(smsg);
-//                spdlog::info(">> Send SNR {0}", smsg);
+//                flog::info(">> Send SNR {0}", smsg);
                 lastSnr = snr;
                 lastCall = currentCall;
                 return;
@@ -339,14 +340,14 @@ R\n            - Reset controller
         lastDemod = 0;
         lastFreq = 0;
         lastSnr = 0;
-        spdlog::info("Disconnect Arduino");
+        flog::info("Disconnect Arduino");
     }
 
     void connectArduino(){
         // Connection to serial port
         char errorOpening = serial.openDevice(ttyport, 9600);
         if (errorOpening!=1) {
-            spdlog::info("Error connecting to Arduino");
+            flog::info("Error connecting to Arduino");
             serial_port = 0;
             return;
         }
